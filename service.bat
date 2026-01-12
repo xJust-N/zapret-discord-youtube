@@ -1,5 +1,5 @@
 @echo off
-set "LOCAL_VERSION=1.9.2"
+set "LOCAL_VERSION=1.9.3"
 
 :: External commands
 if "%~1"=="status_zapret" (
@@ -51,31 +51,46 @@ call :game_switch_status
 call :check_updates_switch_status
 
 set "menu_choice=null"
-echo =========  v!LOCAL_VERSION!  =========
-echo 1. Install Service
-echo 2. Remove Services
-echo 3. Check Status
-echo 4. Run Diagnostics
-echo 5. Check Updates
-echo 6. Switch Check Updates (%CheckUpdatesStatus%)
-echo 7. Switch Game Filter (%GameFilterStatus%)
-echo 8. Switch ipset (%IPsetStatus%)
-echo 9. Update ipset list
-echo 10. Update hosts file (for discord voice)
-echo 11. Run Tests
-echo 0. Exit
-set /p menu_choice=Enter choice (0-11): 
+
+echo.
+echo   ZAPRET SERVICE MANAGER v!LOCAL_VERSION!
+echo   ----------------------------------------
+echo.
+echo   :: SERVICE
+echo      1. Install Service
+echo      2. Remove Services
+echo      3. Check Status
+echo.
+echo   :: SETTINGS
+echo      4. Game Filter         [!GameFilterStatus!]
+echo      5. IPSet Filter        [!IPsetStatus!]
+echo      6. Auto-Update Check   [!CheckUpdatesStatus!]
+echo.
+echo   :: UPDATES
+echo      7. Update IPSet List
+echo      8. Update Hosts File
+echo      9. Check for Updates
+echo.
+echo   :: TOOLS
+echo      10. Run Diagnostics
+echo      11. Run Tests
+echo.
+echo   ----------------------------------------
+echo      0. Exit
+echo.
+
+set /p menu_choice=   Select option (0-11): 
 
 if "%menu_choice%"=="1" goto service_install
 if "%menu_choice%"=="2" goto service_remove
 if "%menu_choice%"=="3" goto service_status
-if "%menu_choice%"=="4" goto service_diagnostics
-if "%menu_choice%"=="5" goto service_check_updates
+if "%menu_choice%"=="4" goto game_switch
+if "%menu_choice%"=="5" goto ipset_switch
 if "%menu_choice%"=="6" goto check_updates_switch
-if "%menu_choice%"=="7" goto game_switch
-if "%menu_choice%"=="8" goto ipset_switch
-if "%menu_choice%"=="9" goto ipset_update
-if "%menu_choice%"=="10" goto hosts_update
+if "%menu_choice%"=="7" goto ipset_update
+if "%menu_choice%"=="8" goto hosts_update
+if "%menu_choice%"=="9" goto service_check_updates
+if "%menu_choice%"=="10" goto service_diagnostics
 if "%menu_choice%"=="11" goto run_tests
 if "%menu_choice%"=="0" exit /b
 goto menu
@@ -188,13 +203,10 @@ set "LISTS_PATH=%~dp0lists\"
 :: Searching for .bat files in current folder, except files that start with "service"
 echo Pick one of the options:
 set "count=0"
-for %%f in (*.bat) do (
-    set "filename=%%~nxf"
-    if /i not "!filename:~0,7!"=="service" (
-        set /a count+=1
-        echo !count!. %%f
-        set "file!count!=%%f"
-    )
+for /f "delims=" %%F in ('powershell -Command "Get-ChildItem -Filter '*.bat' | Where-Object { $_.Name -notlike 'service*' } | Sort-Object { [Regex]::Replace($_.Name, '\d+', { $args[0].Value.PadLeft(8, '0') }) } | ForEach-Object { $_.Name }"') do (
+    set /a count+=1
+    echo !count!. %%F
+    set "file!count!=%%F"
 )
 
 :: Choosing file
@@ -399,16 +411,6 @@ if !proxyEnabled!==1 (
 )
 echo:
 
-:: Check netsh
-where netsh >nul 2>nul
-if !errorlevel! neq 0  (
-    call :PrintRed "[X] netsh command not found, check your PATH variable"
-	echo PATH = "%PATH%"
-	echo:
-	pause
-	goto menu
-)
-
 :: TCP timestamps check
 netsh interface tcp show global | findstr /i "timestamps" | findstr /i "enabled" > nul
 if !errorlevel!==0 (
@@ -488,8 +490,8 @@ echo:
 set "BIN_PATH=%~dp0bin\"
 if not exist "%BIN_PATH%\*.sys" (
     call :PrintRed "WinDivert64.sys file NOT found."
+    echo:
 )
-echo:
 
 :: VPN
 set "VPN_SERVICES="
